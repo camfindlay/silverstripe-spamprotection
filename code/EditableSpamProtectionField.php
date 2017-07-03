@@ -9,6 +9,11 @@
 if (class_exists('EditableFormField')) {
     class EditableSpamProtectionField extends EditableFormField
     {
+
+        private static $db = array(
+            'SpamMapping' => 'Text',
+        );
+
         private static $singular_name = 'Spam Protection Field';
 
         private static $plural_name = 'Spam Protection Fields';
@@ -89,9 +94,9 @@ if (class_exists('EditableFormField')) {
                 ->exclude('Title', ''); // Ignore this field and those without titles
         }
 
-        public function getFieldConfiguration()
+        public function getCMSFields()
         {
-            $fields = parent::getFieldConfiguration();
+            $fields = parent::getCMSFields();
 
             // Get protector
             $protector = FormSpamProtectionExtension::get_protector();
@@ -99,35 +104,24 @@ if (class_exists('EditableFormField')) {
                 return $fields;
             }
 
-            if ($this->Parent()->Fields() instanceof UnsavedRelationList) {
-                return $fields;
-            }
-
-            // Each other text field in this group can be assigned a field mapping
-            $mapGroup = FieldGroup::create(_t(
-                'EditableSpamProtectionField.SPAMFIELDMAPPING',
-                'Spam Field Mapping'
-            ))->setDescription(_t(
-                'EditableSpamProtectionField.SPAMFIELDMAPPINGDESCRIPTION',
-                'Select the form fields that correspond to any relevant spam protection identifiers'
-            ));
-
             // Generate field specific settings
             $mappableFields = Config::inst()->get('FormSpamProtectionExtension', 'mappable_fields');
             $mappableFieldsMerged = array_combine($mappableFields, $mappableFields);
-            foreach ($this->getCandidateFields() as $otherField) {
-                $mapSetting = "Map-{$otherField->Name}";
-                $fieldOption = DropdownField::create(
-                    $this->getSettingName($mapSetting),
-                    $otherField->Title,
-                    $mappableFieldsMerged,
-                    $this->getSetting($mapSetting)
-                )->setEmptyString('');
-                $mapGroup->push($fieldOption);
+            foreach ($this->getCandidateFields() as $field) {
+                $fields->addFieldToTab(
+                    'Root.SpamFieldMapping',
+                    DropdownField::create('SpamMapping['.$field->Name.']', $field->Title, $mappableFieldsMerged)->setEmptyString('')
+                );
             }
-            $fields->insertBefore($mapGroup, $this->getSettingName('ExtraClass'));
-
             return $fields;
+        }
+
+        public function onBeforeWrite()
+        {
+            parent::onBeforeWrite();
+                $mapping = serialize($this->SpamMapping);
+                $this->SpamMapping = $mapping;
+
         }
 
         /**
